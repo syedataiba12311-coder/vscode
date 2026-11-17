@@ -93,6 +93,34 @@ suite('AgentHostIpcChannelTransport', () => {
 		assert.strictEqual(transport.isOpen, false);
 	});
 
+	test('rejects connect when the channel closes while connecting', async () => {
+		const channel = ds.add(new FakeChannel());
+		const pendingConnect = new DeferredPromise<void>();
+		channel.connectResult = pendingConnect.p;
+		const transport = ds.add(new AgentHostIpcChannelTransport(channel));
+
+		const connecting = transport.connect();
+		await Promise.resolve();
+		channel.closeEmitter.fire();
+
+		await assert.rejects(connecting, /Transport closed while connecting/);
+		assert.strictEqual(transport.isOpen, false);
+	});
+
+	test('rejects connect when the transport is disposed while connecting', async () => {
+		const channel = ds.add(new FakeChannel());
+		const pendingConnect = new DeferredPromise<void>();
+		channel.connectResult = pendingConnect.p;
+		const transport = ds.add(new AgentHostIpcChannelTransport(channel));
+
+		const connecting = transport.connect();
+		await Promise.resolve();
+		transport.dispose();
+
+		await assert.rejects(connecting, /Transport closed while connecting/);
+		assert.strictEqual(transport.isOpen, false);
+	});
+
 	test('drops send when transport is not open', async () => {
 		const channel = ds.add(new FakeChannel());
 		const transport = ds.add(new AgentHostIpcChannelTransport(channel));
