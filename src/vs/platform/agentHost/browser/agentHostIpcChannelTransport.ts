@@ -72,7 +72,16 @@ export class AgentHostIpcChannelTransport extends Disposable implements IClientT
 		// host emits between open and our listener attaching.
 		this._register(this._channel.listen<string>('frame')(text => this._handleFrame(text)));
 		this._register(this._channel.listen<void>('close')(() => this._fireClose()));
-		await this._channel.call('connect', options);
+		let rejectClosed!: (error: Error) => void;
+		const closed = new Promise<never>((_, reject) => {
+			rejectClosed = reject;
+		});
+		const closeListener = this.onClose(() => rejectClosed(new Error('Transport closed while connecting')));
+		try {
+			await Promise.race([this._channel.call('connect', options), closed]);
+		} finally {
+			closeListener.dispose();
+		}
 		this._isOpen = true;
 	}
 
